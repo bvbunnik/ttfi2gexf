@@ -34,6 +34,7 @@ private:
     void writeGraph(QXmlStreamWriter *stream, std::vector<std::string> *nodes, QMap<std::string, std::string> *edges);
     void writeNodes(QXmlStreamWriter *stream, std::vector<std::string> *nodes);
     void writeEdges(QXmlStreamWriter *stream, QMap<std::string, std::string> *edges);
+    int index_node;
 
 };
 

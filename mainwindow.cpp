@@ -1,36 +1,9 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-#include <QMessageBox>
 #include <QDebug>
 #include "Csv.h"
 #include <fstream>
-
-template < class T >
-std::ostream& operator << (std::ostream& os, const std::vector<T>& v)
-{
-    //os << "[";
-    for (typename std::vector<T>::const_iterator ii = v.begin(); ii != v.end(); ++ii)
-    {
-        //os << *ii;
-        os << "," << *ii;
-    }
-    //os << " ]";
-    return os;
-}
-
-template < class T >
-std::ostream& operator << (std::ostream& os, const std::vector<std::vector<T> >& v)
-{
-    for (typename std::vector<std::vector<T> >::const_iterator i = v.begin(); i != v.end(); ++i){
-    os << "[";
-        for (typename std::vector<T>::const_iterator ii = i->begin(); ii != i->end(); ++ii)
-        {
-            os << "," << *ii;
-        }
-        os << " ]\n";
-    }
-    return os;
-}
+#include "libgexf/libgexf.h"
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -39,7 +12,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
     dirModel = new QFileSystemModel(this);
     dirModel->setFilter(QDir::NoDotAndDotDot | QDir::Dirs);
-    dirModel->setRootPath(QDir::currentPath());
+    dirModel->setRootPath("/tmp/disney_model/output1/");
     ui->tree->setModel(dirModel);
     ui->tree->sortByColumn(0);
     ui->tree->hideColumn(1);
@@ -96,12 +69,19 @@ void MainWindow::createNetwork(const QModelIndex &index)
     std::vector<std::vector<std::string> > data;
     ttfi.getall(data);
     data.erase(data.begin());
+
     std::vector<std::string> nodes;
-    for (int i=0;i<data.size(); ++i){
-        nodes.push_back(data.at(i).at(0));
+    for (uint i=0;i<data.size(); ++i){
+        if (data.at(i).at(3).compare("-1") != 0){
+            nodes.push_back(data.at(i).at(0));
+        }
+        if(data.at(i).at(3).compare("0") == 0){
+            //index node
+            index_node = std::stoi(data.at(i).at(0));
+        }
     }
     QMap<std::string, std::string> edges;
-    for (int i=0;i<data.size(); ++i){
+    for (uint i=0;i<data.size(); ++i){
         if(data.at(i).at(3).compare("0") != 0 && data.at(i).at(3).compare("-1") != 0){
             edges[data.at(i).at(0)] = data.at(i).at(3);
         }
@@ -109,30 +89,58 @@ void MainWindow::createNetwork(const QModelIndex &index)
     QString gexf_file = dirModel->fileName(index);
     gexf_file.chop(4);
     gexf_file.append(".gexf");
-    QFile output("/tmp/networks/" + gexf_file);
-    output.open(QIODevice::WriteOnly | QIODevice::Text);
-    QXmlStreamWriter stream(&output);
-    stream.setAutoFormatting(true);
-    stream.writeStartDocument();
-    stream.writeDefaultNamespace("http://www.gexf.net/1.2draft");
-    stream.writeStartElement("gexf");
-        stream.writeAttribute("xmlns:viz","http://www.gexf.net/1.2draft/viz");
-        stream.writeAttribute("xmlns:xsi","http://www.w3.org/2001/XMLSchema-instance");
-        stream.writeAttribute("xsi:schemaLocation","http://www.gexf.net/1.2draft http://www.gexf.net/1.2draft/gexf.xsd");
-        stream.writeAttribute("version", "1.2");
-        stream.writeStartElement("meta");
-            stream.writeAttribute("lastmodifieddate", "2017-10-16");
-            stream.writeTextElement("creator", "B. van Bunnik");
-            stream.writeTextElement("description", "Parse a TTFI file to GEXF format");
+
+    QFile output("/home/bram/Documents/networks/" + gexf_file);
+        output.open(QIODevice::WriteOnly | QIODevice::Text);
+        QXmlStreamWriter stream(&output);
+        stream.setAutoFormatting(true);
+        stream.writeStartDocument();
+        stream.writeDefaultNamespace("http://www.gexf.net/1.2draft");
+        stream.writeStartElement("gexf");
+            stream.writeAttribute("xmlns:viz","http://www.gexf.net/1.2draft/viz");
+            stream.writeAttribute("xmlns:xsi","http://www.w3.org/2001/XMLSchema-instance");
+            stream.writeAttribute("xsi:schemaLocation","http://www.gexf.net/1.2draft http://www.gexf.net/1.2draft/gexf.xsd");
+            stream.writeAttribute("version", "1.2");
+            stream.writeStartElement("meta");
+                stream.writeAttribute("lastmodifieddate", "2017-10-16");
+                stream.writeTextElement("creator", "B. van Bunnik");
+                stream.writeTextElement("description", "TTFI file parsed to GEXF format");
+            stream.writeEndElement();
+            writeGraph(&stream, &nodes, &edges);
         stream.writeEndElement();
-        writeGraph(&stream, &nodes, &edges);
-    stream.writeEndElement();
-//! [finish stream]
-    stream.writeEndDocument();
-//! [finish stream]
-//! [write output]
+    //! [finish stream]
+        stream.writeEndDocument();
+    //! [finish stream]
+    //! [write output]
     output.close();
-    qDebug() << "All done...";
+
+//    libgexf::GEXF *gexf = new libgexf::GEXF();
+//    libgexf::DirectedGraph& graph = gexf->getDirectedGraph();
+//    libgexf::MetaData& meta = gexf->getMetaData();
+//    meta.setCreator("B. van Bunnik");
+//    meta.setDescription("TTFI file parsed to GEXF format");
+//    meta.setLastModifiedDate(QDate::currentDate().toString("dd-MM-yyyy").toStdString());
+//    meta.setSchema("http://www.gexf.net/1.2draft http://www.gexf.net/1.2draft/gexf.xsd");
+//    meta.setXmlns("http://www.gexf.net/1.2draft");
+//    meta.setViz("http://www.gexf.net/1.2draft/viz");
+//    meta.setXsi("http://www.w3.org/2001/XMLSchema-instance");
+//    meta.setVersion("1.2");
+//    QVector<std::string>::iterator itt = nodes.begin();
+//    while (itt != nodes.cend()){
+//        graph.addNode(*itt);
+//        ++itt;
+//    }
+//    QMap<std::string, std::string>::const_iterator i = edges.constBegin();
+//    int id = 0;
+//    while (i != edges.constEnd()) {
+//        graph.addEdge( QString::number(id).toStdString(), i.value(), i.key());
+//        ++i; ++id;
+//    }
+//    libgexf::FileWriter *writer = new libgexf::FileWriter();
+//    gexf_file = "/home/bram/Documents/networks/" + gexf_file;
+//    writer->init(gexf_file.toStdString(), gexf);
+//    writer->write();
+    qDebug() << "Done writing file, you can find it at: " << gexf_file;
 }
 
 
@@ -154,6 +162,13 @@ void MainWindow::writeNodes(QXmlStreamWriter *stream, std::vector<std::string> *
             stream->writeStartElement("node");
                 stream->writeAttribute("id", QString::fromStdString(*itt));
                 stream->writeAttribute("label", QString::fromStdString(*itt));
+                if (std::stoi(*itt)==index_node){
+                    stream->writeEmptyElement("viz:color");
+                        stream->writeAttribute("r", "239");
+                        stream->writeAttribute("g", "173");
+                        stream->writeAttribute("b","66");
+                        stream->writeAttribute("a","0.6");
+                }
             stream->writeEndElement();
             ++itt;
         }
@@ -170,8 +185,8 @@ void MainWindow::writeEdges(QXmlStreamWriter *stream, QMap<std::string, std::str
         while (i != edges->constEnd()) {
             stream->writeStartElement("edge");
                 stream->writeAttribute("id", QString::number(id));
-                stream->writeAttribute("source", QString::fromStdString(i.key()));
-                stream->writeAttribute("target", QString::fromStdString(i.value()));
+                stream->writeAttribute("source", QString::fromStdString(i.value()));
+                stream->writeAttribute("target", QString::fromStdString(i.key()));
             stream->writeEndElement();
             ++i;
             ++id;

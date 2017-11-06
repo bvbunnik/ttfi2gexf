@@ -27,13 +27,15 @@ class Csv {	// read and parse comma-separated values
 	int getall(std::vector<std::vector<std::string> >&);
 
   private:
+    std::istream& fin;			// input file pointer
+    unsigned int nfield;				// number of fields
+    std::string fieldsep;		// separator characters
     bool hasHeader;
     std::vector<std::string> header;
-	std::istream& fin;			// input file pointer
 	std::string line;			// input line
 	std::vector<std::string> field;	// field strings
-	unsigned int nfield;				// number of fields
-	std::string fieldsep;		// separator characters
+
+
 
 	int split();
 	int endofline(char);
